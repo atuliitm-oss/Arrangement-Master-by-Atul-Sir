@@ -113,26 +113,26 @@ export default function App() {
   };
 
   const generateReport = () => {
-    let msg = `*📝 शिक्षक अरेंजमेंट रिपोर्ट - ${selectedDate}*\n`;
-    msg += `*तारीख:* ${selectedDate} (${selectedDay})\n`;
-    msg += `*अनुपस्थित:* ${absentTeachers.join(', ')}\n`;
+    let msg = `*📝 Teacher Arrangement Report - ${selectedDate}*\n`;
+    msg += `*Date:* ${selectedDate} (${selectedDay})\n`;
+    msg += `*Absent:* ${absentTeachers.join(', ')}\n`;
     msg += `--------------------------\n\n`;
     absentTeachers.forEach(absName => {
-      msg += `📍 *${absName} की क्लासेज:* \n`;
+      msg += `📍 *Classes for ${absName}:* \n`;
       let hasClass = false;
       periods.forEach((pName, pIdx) => {
         const absT = teachers.find(t => t.name === absName);
         const classInfo = absT?.schedule[selectedDay]?.[pIdx];
         if (classInfo && classInfo !== "—") {
-          const sub = (arrangements[pIdx] && arrangements[pIdx][absName]) || "_KHALI_";
+          const sub = (arrangements[pIdx] && arrangements[pIdx][absName]) || "_VACANT_";
           msg += `• ${pName} (${classInfo}): *${sub}*\n`;
           hasClass = true;
         }
       });
-      if (!hasClass) msg += `_आज कोई क्लास नहीं थी_\n`;
+      if (!hasClass) msg += `_No classes scheduled today_\n`;
       msg += `\n`;
     });
-    msg += `--------------------------\n_Smart ArrangeMaster v15_`;
+    msg += `--------------------------\n_Smart ArrangeMaster by Atul Sharma Sir_`;
     return msg;
   };
 
@@ -205,7 +205,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <div className="bg-indigo-600 p-2 rounded-xl"><Users size={20}/></div>
             <div>
-              <h1 className="text-sm font-black tracking-widest leading-none">ARRANGEMASTER v15</h1>
+              <h1 className="text-sm font-black tracking-widest leading-none uppercase">ARRANGEMASTER BY ATUL SHARMA SIR</h1>
               <p className="text-[8px] font-bold text-indigo-400 mt-1 uppercase">Unified Workload & Absentee List</p>
             </div>
           </div>
@@ -320,7 +320,7 @@ export default function App() {
               <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-black text-slate-800 leading-none">{selectedDay}</h2>
-                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-2 italic">Substitute Matrix v15</p>
+                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-2 italic">Substitute Matrix - Atul Sharma Sir</p>
                 </div>
                 <button onClick={autoArrangeAll} className="bg-indigo-600 text-white px-5 py-3 rounded-2xl font-black text-[10px] flex items-center gap-2 shadow-xl active:scale-95 transition-all uppercase tracking-widest">
                   <Wand2 size={16}/> ऑटो-असाइन
@@ -385,7 +385,7 @@ export default function App() {
                                   <option value="">+ असाइन करें</option>
                                   {available.map(t => (
                                     <option key={t.name} value={t.name}>
-                                      {t.name} {LOW_PRIORITY_NAMES.some(lp => t.name.toLowerCase().includes(lp)) ? '(Low Pri.)' : `(${t.total})`} | {subCounts[t.name] || 0}/{MAX_LIMIT}
+                                      {t.name} ({t.total}) | {subCounts[t.name] || 0}/{MAX_LIMIT}
                                     </option>
                                   ))}
                                 </select>
