@@ -37,12 +37,22 @@ interface Teacher {
 export default function App() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [absentTeachers, setAbsentTeachers] = useState<string[]>([]);
-  const [confirmedAbsent, setConfirmedAbsent] = useState(false); 
-  const [arrangements, setArrangements] = useState<{[period: number]: {[absentName: string]: string}}>({}); 
+  
+  // Persistent Daily Data Structure
+  const [dailyRegistry, setDailyRegistry] = useState<{[date: string]: any}>({});
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [copyStatus, setCopyStatus] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // शिक्षकों को खोजने के लिए
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Derive current day data from registry
+  const currentDayData = useMemo(() => {
+    return dailyRegistry[selectedDate] || { absent: [], confirmed: false, arrangements: {} };
+  }, [selectedDate, dailyRegistry]);
+
+  const absentTeachers = currentDayData.absent || [];
+  const confirmedAbsent = currentDayData.confirmed || false;
+  const arrangements = currentDayData.arrangements || {};
 
   // बिज़नेस रूल्स
   const RESTRICTED_NAMES = ["anju", "vatsa", "neetu"];
@@ -51,8 +61,6 @@ export default function App() {
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const periods = ["1st P", "2nd P", "3rd P", "4th P", "5th P", "6th P", "7th P", "8th P"];
-
-  useEffect(() => { loadXlsxScript(); }, []);
 
   const selectedDay = useMemo(() => {
     const date = new Date(selectedDate);
@@ -82,13 +90,56 @@ export default function App() {
       const isLowB = LOW_PRIORITY_NAMES.some(lp => b.name.toLowerCase().includes(lp));
       if (isLowA && !isLowB) return 1;
       if (!isLowA && isLowB) return -1;
+      
+      const dailyA = (a.schedule[selectedDay] || []).filter(p => p && p !== "—" && p.trim() !== "").length;
+      const dailyB = (b.schedule[selectedDay] || []).filter(p => p && p !== "—" && p.trim() !== "").length;
+      
+      if (dailyA !== dailyB) return dailyA - dailyB;
       return (a.total || 0) - (b.total || 0);
+    });
+  };
+
+  // Load Initial Data from LocalStorage
+  useEffect(() => {
+    loadXlsxScript();
+    
+    const savedTeachers = localStorage.getItem('am_teachers');
+    if (savedTeachers) setTeachers(JSON.parse(savedTeachers));
+    
+    const savedRegistry = localStorage.getItem('am_daily_registry');
+    if (savedRegistry) setDailyRegistry(JSON.parse(savedRegistry));
+  }, []);
+
+  // Save Daily Data to LocalStorage
+  const updateDailyData = (updates: any) => {
+    setDailyRegistry(prev => {
+      const newRegistry = {
+        ...prev,
+        [selectedDate]: {
+          ...(prev[selectedDate] || {}),
+          ...updates
+        }
+      };
+      localStorage.setItem('am_daily_registry', JSON.stringify(newRegistry));
+      return newRegistry;
     });
   };
 
   const toggleAbsentTeacher = (name: string) => {
     if (confirmedAbsent) return;
-    setAbsentTeachers(prev => prev.includes(name) ? prev.filter(t => t !== name) : [...prev, name]);
+    const newAbsent = absentTeachers.includes(name) 
+      ? absentTeachers.filter(t => t !== name) 
+      : [...absentTeachers, name];
+    
+    updateDailyData({ absent: newAbsent });
+  };
+
+  const handleConfirmAbsent = (val: boolean) => {
+    updateDailyData({ confirmed: val });
+  };
+
+  const handleUpdateArrangements = (newArr: any) => {
+    updateDailyData({ arrangements: newArr });
   };
 
   const autoArrangeAll = () => {
@@ -109,7 +160,7 @@ export default function App() {
         }
       });
     });
-    setArrangements(newArr);
+    handleUpdateArrangements(newArr);
   };
 
   const generateReport = () => {
@@ -184,8 +235,8 @@ export default function App() {
         });
         const sorted = newList.sort((a, b) => a.name.localeCompare(b.name));
         setTeachers(sorted);
-        setAbsentTeachers([]);
-        setConfirmedAbsent(false);
+        localStorage.setItem('am_teachers', JSON.stringify(sorted));
+        updateDailyData({ absent: [], confirmed: false, arrangements: {} });
       } catch (err) { alert("Excel Parsing Error"); }
       finally { setIsProcessing(false); }
     };
@@ -290,13 +341,13 @@ export default function App() {
               <div className="mt-6 pt-6 border-t border-slate-100">
                 {!confirmedAbsent ? (
                   <button 
-                    onClick={() => setConfirmedAbsent(true)}
+                    onClick={() => handleConfirmAbsent(true)}
                     className="w-full bg-red-600 text-white p-5 rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
                   >
                     <UserX size={18}/> अनुपस्थित फाइनल करें ({absentTeachers.length})
                   </button>
                 ) : (
-                  <button onClick={() => {setConfirmedAbsent(false); setArrangements({});}} className="w-full text-indigo-600 font-black text-[10px] p-2 text-center uppercase tracking-widest hover:underline">
+                  <button onClick={() => {handleConfirmAbsent(false); handleUpdateArrangements({});}} className="w-full text-indigo-600 font-black text-[10px] p-2 text-center uppercase tracking-widest hover:underline">
                     ← लिस्ट बदलें
                   </button>
                 )}
@@ -368,7 +419,7 @@ export default function App() {
                                   <button onClick={() => {
                                     const next = { ...arrangements };
                                     delete next[pIdx][absName];
-                                    setArrangements(next);
+                                    handleUpdateArrangements(next);
                                   }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
                                 </div>
                               ) : (
@@ -378,16 +429,19 @@ export default function App() {
                                     const next = { ...arrangements };
                                     if(!next[pIdx]) next[pIdx] = {};
                                     next[pIdx][absName] = e.target.value;
-                                    setArrangements(next);
+                                    handleUpdateArrangements(next);
                                   }}
                                   value=""
                                 >
                                   <option value="">+ असाइन करें</option>
-                                  {available.map(t => (
-                                    <option key={t.name} value={t.name}>
-                                      {t.name} ({t.total}) | {subCounts[t.name] || 0}/{MAX_LIMIT}
-                                    </option>
-                                  ))}
+                                  {available.map(t => {
+                                    const dailyPeriods = (t.schedule[selectedDay] || []).filter(p => p && p !== "—" && p.trim() !== "").length;
+                                    return (
+                                      <option key={t.name} value={t.name}>
+                                        {t.name} ({dailyPeriods}) | {subCounts[t.name] || 0}/{MAX_LIMIT}
+                                      </option>
+                                    );
+                                  })}
                                 </select>
                               )}
                               {available.length === 0 && !assigned && (
