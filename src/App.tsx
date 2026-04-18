@@ -63,7 +63,9 @@ export default function App() {
   const periods = ["1st P", "2nd P", "3rd P", "4th P", "5th P", "6th P", "7th P", "8th P"];
 
   const selectedDay = useMemo(() => {
-    const date = new Date(selectedDate);
+    if (!selectedDate) return "Monday";
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     return dayNames[date.getDay()];
   }, [selectedDate]);
@@ -91,8 +93,8 @@ export default function App() {
       if (isLowA && !isLowB) return 1;
       if (!isLowA && isLowB) return -1;
       
-      const dailyA = (a.schedule[selectedDay] || []).filter(p => p && p !== "—" && p.trim() !== "").length;
-      const dailyB = (b.schedule[selectedDay] || []).filter(p => p && p !== "—" && p.trim() !== "").length;
+      const dailyA = (a.schedule?.[selectedDay] || []).filter(p => typeof p === 'string' && p.trim() !== "" && p !== "—").length;
+      const dailyB = (b.schedule?.[selectedDay] || []).filter(p => typeof p === 'string' && p.trim() !== "" && p !== "—").length;
       
       if (dailyA !== dailyB) return dailyA - dailyB;
       return (a.total || 0) - (b.total || 0);
@@ -435,7 +437,7 @@ export default function App() {
                                 >
                                   <option value="">+ असाइन करें</option>
                                   {available.map(t => {
-                                    const dailyPeriods = (t.schedule[selectedDay] || []).filter(p => p && p !== "—" && p.trim() !== "").length;
+                                    const dailyPeriods = (t.schedule?.[selectedDay] || []).filter(p => typeof p === 'string' && p.trim() !== "" && p !== "—").length;
                                     return (
                                       <option key={t.name} value={t.name}>
                                         {t.name} ({dailyPeriods}) | {subCounts[t.name] || 0}/{MAX_LIMIT}
