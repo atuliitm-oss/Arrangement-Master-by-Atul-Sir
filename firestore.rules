@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 256 && !id.matches('.*/.*');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Teachers Collection
+    match /teachers/{teacherId} {
+      allow read: if isSignedIn();
+      // Explicitly allow all CRUD operations for signed-in users
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Daily Data Collection
+    match /dailyData/{date} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+  }
+}

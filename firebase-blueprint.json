@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Teacher profile and weekly schedule",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "total": { "type": "number" },
+        "schedule": {
+          "type": "object",
+          "description": "Map of day name to list of 8 period strings"
+        }
+      },
+      "required": ["name", "schedule"]
+    },
+    "DailyData": {
+      "title": "Daily Data",
+      "description": "Marked absences and arrangements for a specific date",
+      "type": "object",
+      "properties": {
+        "absent": { "type": "array", "items": { "type": "string" } },
+        "confirmed": { "type": "boolean" },
+        "arrangements": { 
+          "type": "object", 
+          "description": "Map of period index to map of absent teacher name to substitute teacher name" 
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/teachers/{teacherName}": {
+      "schema": "Teacher",
+      "description": "Collection of all teachers with their schedules"
+    },
+    "/dailyData/{date}": {
+      "schema": "DailyData",
+      "description": "Absences and arrangements for a specific date (YYYY-MM-DD)"
+    }
+  }
+}
