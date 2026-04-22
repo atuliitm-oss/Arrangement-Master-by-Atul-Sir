@@ -24,15 +24,12 @@ service cloud.firestore {
 
     // Teachers Collection
     match /teachers/{teacherId} {
-      allow read: if isSignedIn();
-      // Explicitly allow all CRUD operations for signed-in users
-      allow create, update, delete: if isSignedIn();
+      allow read, write: if true;
     }
 
     // Daily Data Collection
     match /dailyData/{date} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if true;
     }
   }
 }

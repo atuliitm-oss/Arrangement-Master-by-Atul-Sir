@@ -7,10 +7,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   UserX, Search, UserCheck, Clock, Calendar as CalendarIcon, 
   AlertCircle, CheckCircle2, Users, Wand2, Share2, Upload, 
-  Trash2, Plus, FileSpreadsheet, X, Save, UserPlus, Info, Check, MessageCircle, Copy, CheckCircle, ShieldAlert, BarChart3, Filter, LogOut, LogIn, ArrowLeft
+  Trash2, Plus, FileSpreadsheet, X, Save, UserPlus, Info, Check, MessageCircle, Copy, CheckCircle, ShieldAlert, BarChart3, Filter, ArrowLeft
 } from 'lucide-react';
-import { db, auth, signInWithGoogle } from './lib/firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { db } from './lib/firebase';
 import { 
   collection, 
   doc, 
@@ -59,7 +58,6 @@ const getClassGroup = (num: number | null): string | null => {
 };
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   
@@ -152,24 +150,13 @@ export default function App() {
     });
   };
 
-  // Load Initial Data from Firestore
+  // Load Initial Data
   useEffect(() => {
     loadXlsxScript();
-
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) setIsLoading(false);
-    });
-
-    return () => unsubAuth();
   }, []);
 
   // Sync Teachers from Firestore
   useEffect(() => {
-    if (!user) {
-      setTeachers([]);
-      return;
-    }
     const unsub = onSnapshot(collection(db, "teachers"), (snap) => {
       try {
         const list: Teacher[] = snap.docs.map(d => {
@@ -195,14 +182,10 @@ export default function App() {
       }
     });
     return () => unsub();
-  }, [user]);
+  }, []);
 
   // Sync Daily Data from Firestore
   useEffect(() => {
-    if (!user) {
-      setDailyRegistry({});
-      return;
-    }
     const unsub = onSnapshot(collection(db, "dailyData"), (snap) => {
       const reg: {[date: string]: any} = {};
       snap.docs.forEach(d => {
@@ -213,11 +196,10 @@ export default function App() {
       console.error("Firestore Listen Error (DailyData):", error);
     });
     return () => unsub();
-  }, [user]);
+  }, []);
 
   // Save Daily Data to Firestore
   const updateDailyData = async (updates: any) => {
-    if (!user) return;
     try {
       const docRef = doc(db, "dailyData", selectedDate);
       await setDoc(docRef, {
@@ -228,19 +210,6 @@ export default function App() {
       console.error("Firestore Update Error", err);
     }
   };
-
-  const handleLogin = async () => {
-    try {
-      setIsProcessing(true);
-      await signInWithGoogle();
-    } catch (err) {
-      alert("Login Error");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleLogout = () => signOut(auth);
 
   const toggleAbsentTeacher = (name: string) => {
     if (confirmedAbsent) return;
@@ -260,7 +229,7 @@ export default function App() {
   };
 
   const handleDeleteTeacher = async (teacher: Teacher) => {
-    if (!user || !teacher.id) {
+    if (!teacher.id) {
       alert("डिलीट करने में विफल: टीचर आईडी नहीं मिली।");
       return;
     }
@@ -287,7 +256,6 @@ export default function App() {
   };
 
   const handleClearDatabase = async () => {
-    if (!user) return;
     const confirmClear = window.confirm("सावधान! क्या आप वाकई डेटाबेस से सभी टीचर्स को हटाना चाहते हैं? यह प्रक्रिया वापस नहीं ली जा सकती।");
     if (!confirmClear) return;
 
@@ -316,7 +284,7 @@ export default function App() {
   };
 
   const handleBulkDelete = async () => {
-    if (!user || selectedTeachers.length === 0) {
+    if (selectedTeachers.length === 0) {
       alert("डिलीट करने के लिए कोई टीचर सिलेक्ट नहीं किया गया है।");
       return;
     }
@@ -627,18 +595,15 @@ export default function App() {
               <h1 className="text-sm font-black tracking-widest leading-none uppercase">ARRANGEMASTER BY ATUL SHARMA SIR</h1>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[8px] font-bold text-indigo-400 uppercase">Unified Workload & Absentee List</p>
-                {user && (
-                  <span className="text-[7px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-black">
-                    DB: {teachers.length} TEACHERS
-                  </span>
-                )}
+                <span className="text-[7px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-black">
+                  DB: {teachers.length} TEACHERS
+                </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {user && (
-              <div className="bg-black/40 rounded-xl p-1 flex items-center gap-1 border border-white/5 mr-4 overflow-hidden hidden md:flex">
+            <div className="bg-black/40 rounded-xl p-1 flex items-center gap-1 border border-white/5 mr-4 overflow-hidden hidden md:flex">
                 <button 
                   onClick={() => setViewMode('daily')}
                   className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2 ${
@@ -656,18 +621,12 @@ export default function App() {
                   <Trash2 size={14}/> मैनेज डाटा
                 </button>
               </div>
-            )}
             
             <div className="bg-black/20 rounded-lg p-1.5 flex items-center gap-2 border border-white/5">
               <CalendarIcon size={14} className="text-indigo-400"/>
               <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} 
                 className="bg-transparent border-none text-[10px] font-black text-white outline-none cursor-pointer uppercase"/>
             </div>
-            {user && (
-              <button onClick={handleLogout} className="bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors text-white">
-                <LogOut size={16}/>
-              </button>
-            )}
           </div>
         </div>
       </nav>
@@ -678,25 +637,8 @@ export default function App() {
             
             {/* Selection Sidebar */}
             <div className="lg:col-span-5 space-y-4">
-              {!user ? (
-                <div className="bg-white p-8 rounded-[2rem] border shadow-sm text-center flex flex-col items-center justify-center space-y-6 min-h-[300px]">
-                  <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center">
-                    <ShieldAlert size={40} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Login Required</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Please login to access the database</p>
-                  </div>
-                  <button 
-                    onClick={handleLogin}
-                    className="w-full bg-slate-900 text-white p-5 rounded-[1.5rem] font-black text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-widest"
-                  >
-                    <LogIn size={18}/> Sign in with Google
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-white p-6 rounded-[2rem] border shadow-sm">
+              <>
+                <div className="bg-white p-6 rounded-[2rem] border shadow-sm">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                       <Upload size={14} className="text-indigo-500"/> एक्सेल डाटा सोर्स
                     </h3>
@@ -823,8 +765,7 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-                </>
-              )}
+              </>
             </div>
 
             {/* Board Column */}
