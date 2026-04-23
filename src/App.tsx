@@ -506,15 +506,23 @@ export default function App() {
           
           const rawCell = row[0] ? row[0].toString().split('\n')[0].trim() : "";
           const cleanedName = rawCell.split(/\s*[-()|/]\s*/)[0].trim();
-          const name = cleanedName || curName;
+          
+          // Improved: Skip numeric values and class-like patterns (e.g., 10th A, 3rd B, 10-A, VII-B)
+          const isNumeric = /^\d+$/.test(cleanedName);
+          const isClass = /^\d+\s*(st|nd|rd|th)/i.test(cleanedName) || 
+                          cleanedName.toLowerCase().startsWith('class ') ||
+                          /^\d+[- ]?[A-Z0-9]$/i.test(cleanedName) ||
+                          /^(I|II|III|IV|V|VI|VII|VIII|IX|X)[- ]?[A-Z]$/i.test(cleanedName);
+          const finalName = (cleanedName && !isNumeric && !isClass) ? cleanedName : (cleanedName ? "" : curName);
           
           const rawDay = row[1] ? row[1].toString().trim() : "";
           const day = days.find(d => 
             d.toLowerCase().startsWith(rawDay.toLowerCase().substring(0, 3))
           ) || "";
 
-          if (name && day) {
-            curName = name;
+          if (finalName && day) {
+            curName = finalName;
+            const name = finalName;
             const sched = row.slice(2, 10).map(c => (c !== undefined && c !== null) ? String(c).trim() : "—");
             while (sched.length < 8) sched.push("—");
             if (sched.length > 8) sched.length = 8;
