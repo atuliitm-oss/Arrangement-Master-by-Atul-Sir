@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 256 && !id.matches('.*/.*');
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -22,14 +22,36 @@ service cloud.firestore {
       return resource.data;
     }
 
+    // --- TEACHER VALIDATION ---
+    function isValidTeacher(data) {
+      return data.keys().hasAll(['name', 'schedule']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.total is number &&
+             data.schedule is map &&
+             data.keys().size() <= 4; // name, total, schedule, [optional id]
+    }
+
+    // --- DAILY DATA VALIDATION ---
+    function isValidDailyData(data) {
+      return data.keys().hasAll(['absent', 'arrangements']) &&
+             data.absent is list &&
+             data.absent.size() <= 200 && // Safety limit
+             data.arrangements is map &&
+             data.keys().size() <= 6; // absent, confirmed, arrangements, updatedAt, [others]
+    }
+
     // Teachers Collection
     match /teachers/{teacherId} {
-      allow read, write: if true;
+      allow read: if true; // Public view for simple substitution apps
+      allow create, update: if isSignedIn() && isValidTeacher(incoming()) && isValidId(teacherId);
+      allow delete: if isSignedIn();
     }
 
     // Daily Data Collection
     match /dailyData/{date} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isSignedIn() && isValidDailyData(incoming()) && isValidId(date);
+      allow delete: if isSignedIn();
     }
   }
 }
