@@ -9,8 +9,7 @@ import {
   AlertCircle, CheckCircle2, Users, Wand2, Share2, Upload, 
   Trash2, Plus, FileSpreadsheet, X, Save, UserPlus, Info, Check, MessageCircle, Copy, CheckCircle, ShieldAlert, BarChart3, Filter, ArrowLeft
 } from 'lucide-react';
-import { db, auth, signInWithGoogle } from './lib/firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { db } from './lib/firebase';
 import { 
   collection, 
   doc, 
@@ -77,7 +76,6 @@ export default function App() {
   const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const [selectedNoticeItem, setSelectedNoticeItem] = useState<{name: string, date: string} | null>(null);
-  const [user, setUser] = useState<User | null>(null);
 
   // Derive current day data from registry
   const currentDayData = useMemo(() => {
@@ -124,14 +122,6 @@ export default function App() {
   const RESTRICTED_NAMES = ["anju", "vatsa", "neetu"];
   const LOW_PRIORITY_NAMES = ["atul", "madhuri", "rekha", "prabha", "nisha"];
   const MAX_LIMIT = 2; 
-
-  const checkAuth = () => {
-    if (!user) {
-      alert("यह कार्यवाही करने के लिए कृपया साइन इन करें।");
-      return false;
-    }
-    return true;
-  };
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const periods = ["1st P", "2nd P", "3rd P", "4th P", "5th P", "6th P", "7th P", "8th P"];
@@ -197,11 +187,6 @@ export default function App() {
   // Load Initial Data
   useEffect(() => {
     loadXlsxScript();
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) setViewMode('daily');
-    });
-    return () => unsubAuth();
   }, []);
 
   // Sync Teachers from Firestore
@@ -249,7 +234,6 @@ export default function App() {
 
   // Save Daily Data to Firestore
   const updateDailyData = async (updates: any) => {
-    if (!checkAuth()) return;
     try {
       const docRef = doc(db, "dailyData", selectedDate);
       await setDoc(docRef, {
@@ -286,7 +270,6 @@ export default function App() {
   };
 
   const handleDeleteNoticeItem = async () => {
-    if (!checkAuth()) return;
     if (!selectedNoticeItem) return;
     const { name, date } = selectedNoticeItem;
     const dateFormatted = date.split('-').reverse().join('/');
@@ -331,7 +314,6 @@ export default function App() {
   };
 
   const handleDeleteTeacher = async (teacher: Teacher) => {
-    if (!checkAuth()) return;
     if (!teacher.id) {
       alert("डिलीट करने में विफल: टीचर आईडी नहीं मिली।");
       return;
@@ -387,7 +369,6 @@ export default function App() {
   };
 
   const handleBulkDelete = async () => {
-    if (!checkAuth()) return;
     if (selectedTeachers.length === 0) {
       alert("डिलीट करने के लिए कोई टीचर सिलेक्ट नहीं किया गया है।");
       return;
@@ -576,7 +557,6 @@ export default function App() {
   };
 
   const saveStagedData = async () => {
-    if (!checkAuth()) return;
     if (!stagedTeachers || stagedTeachers.length === 0) return;
 
     setIsProcessing(true);
@@ -716,29 +696,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {user ? (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 rounded-full">
-                  <img src={user.photoURL || ""} alt="" className="w-5 h-5 rounded-full ring-2 ring-indigo-500/30" />
-                  <span className="text-[10px] font-black text-indigo-400 uppercase hidden sm:inline">{user.displayName?.split(' ')[0]}</span>
-                </div>
-                <button 
-                  onClick={() => signOut(auth)}
-                  className="p-2 text-white/40 hover:text-red-400 transition-colors"
-                  title="Log Out"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => signInWithGoogle()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
-              >
-                Sign In
-              </button>
-            )}
-
             <div className="bg-black/40 rounded-xl p-1 flex items-center gap-1 border border-white/5 mr-4 overflow-hidden hidden md:flex">
                 <button 
                   onClick={() => setViewMode('daily')}
@@ -748,16 +705,14 @@ export default function App() {
                 >
                   <Users size={14}/> अटेंडेंस
                 </button>
-                {user && (
-                  <button 
-                    onClick={() => setViewMode('manage')}
-                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2 ${
-                      viewMode === 'manage' ? "bg-red-600 text-white shadow-lg" : "text-white/40 hover:text-white"
-                    }`}
-                  >
-                    <Trash2 size={14}/> मैनेज डाटा
-                  </button>
-                )}
+                <button 
+                  onClick={() => setViewMode('manage')}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2 ${
+                    viewMode === 'manage' ? "bg-red-600 text-white shadow-lg" : "text-white/40 hover:text-white"
+                  }`}
+                >
+                  <Trash2 size={14}/> मैनेज डाटा
+                </button>
               </div>
             
             <div className="bg-black/20 rounded-lg p-1.5 flex items-center gap-2 border border-white/5">
@@ -868,7 +823,6 @@ export default function App() {
             
             {/* Selection Sidebar */}
             <div className="lg:col-span-5 space-y-4">
-              {user && (
                 <div className="bg-white p-6 rounded-[2rem] border shadow-sm">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                       <Upload size={14} className="text-indigo-500"/> एक्सेल डाटा सोर्स
@@ -915,7 +869,6 @@ export default function App() {
                       </div>
                     )}
                   </div>
-              )}
 
                   <div className="bg-white p-6 rounded-[2rem] border shadow-sm flex flex-col">
                     <div className="flex items-center justify-between mb-4">
@@ -998,16 +951,14 @@ export default function App() {
                       </div>
                     )}
 
-                    {user && (
-                      <div className="mt-4 pt-4 border-t border-slate-50">
-                        <button 
-                          onClick={() => { setViewMode('manage'); setSelectedTeachers([]); }}
-                          className="w-full text-red-500 font-black text-[9px] py-3 rounded-2xl bg-red-50 hover:bg-red-100 transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
-                        >
-                          <Trash2 size={14}/> टीचर्स डिलीट करें / मैनेज डेटा
-                        </button>
-                      </div>
-                    )}
+                    <div className="mt-4 pt-4 border-t border-slate-50">
+                      <button 
+                        onClick={() => { setViewMode('manage'); setSelectedTeachers([]); }}
+                        className="w-full text-red-500 font-black text-[9px] py-3 rounded-2xl bg-red-50 hover:bg-red-100 transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
+                      >
+                        <Trash2 size={14}/> टीचर्स डिलीट करें / मैनेज डेटा
+                      </button>
+                    </div>
                   </div>
             </div>
 
