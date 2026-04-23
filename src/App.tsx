@@ -74,15 +74,48 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'daily' | 'manage'>('daily');
   const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+  const [selectedNoticeItem, setSelectedNoticeItem] = useState<{name: string, date: string} | null>(null);
 
   // Derive current day data from registry
   const currentDayData = useMemo(() => {
     return dailyRegistry[selectedDate] || { absent: [], confirmed: false, arrangements: {} };
   }, [selectedDate, dailyRegistry]);
 
+  // New: Derive all future absences for management overview
+  const futureAbsences = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const upcoming: { date: string, teachers: string[] }[] = [];
+    Object.keys(dailyRegistry).forEach(date => {
+      if (date > todayStr && dailyRegistry[date].absent?.length > 0) {
+        upcoming.push({ date, teachers: dailyRegistry[date].absent });
+      }
+    });
+    return upcoming.sort((a, b) => a.date.localeCompare(b.date));
+  }, [dailyRegistry]);
+
   const absentTeachers = currentDayData.absent || [];
   const confirmedAbsent = currentDayData.confirmed || false;
   const arrangements = currentDayData.arrangements || {};
+
+  // New: Notice Board Logic (Aggregating upcoming absences by teacher)
+  const noticeBoardData = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const teacherMap: { [name: string]: string[] } = {};
+
+    Object.keys(dailyRegistry).forEach(date => {
+      // Show from today onwards
+      if (date >= todayStr && dailyRegistry[date].absent?.length > 0) {
+        dailyRegistry[date].absent.forEach((name: string) => {
+          if (!teacherMap[name]) teacherMap[name] = [];
+          if (!teacherMap[name].includes(date)) teacherMap[name].push(date);
+        });
+      }
+    });
+
+    return Object.entries(teacherMap)
+      .map(([name, dates]) => ({ name, dates: dates.sort() }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [dailyRegistry]);
 
   // बिज़नेस रूल्स
   const RESTRICTED_NAMES = ["anju", "vatsa", "neetu"];
@@ -224,8 +257,62 @@ export default function App() {
     updateDailyData({ confirmed: val });
   };
 
+  const handleClearTodayAbsent = async () => {
+    if (confirmedAbsent) return;
+    if (window.confirm("क्या आप आज की अनुपस्थित लिस्ट को पूरी तरह साफ़ करना चाहते हैं?")) {
+      updateDailyData({ absent: [] });
+    }
+  };
+
   const handleUpdateArrangements = (newArr: any) => {
     updateDailyData({ arrangements: newArr });
+  };
+
+  const handleDeleteNoticeItem = async () => {
+    if (!selectedNoticeItem) return;
+    const { name, date } = selectedNoticeItem;
+    const dateFormatted = date.split('-').reverse().join('/');
+    
+    if (!window.confirm(`${name} का ${dateFormatted} का एब्सेंट रिकॉर्ड हटाना चाहते हैं?`)) return;
+
+    try {
+      setIsProcessing(true);
+      
+      // Get the most up-to-date document first as an extra safety measure
+      const docRef = doc(db, "dailyData", date);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        throw new Error("डेटाबेस में यह तारीख नहीं मिली।");
+      }
+
+      const dayData = docSnap.data();
+      const currentAbsent = Array.isArray(dayData.absent) ? dayData.absent : [];
+      
+      // Check if teacher is actually in the list
+      if (!currentAbsent.includes(name)) {
+        alert("यह टीचर इस तारीख की लिस्ट में पहले से ही नहीं है।");
+        setSelectedNoticeItem(null);
+        return;
+      }
+
+      const newAbsent = currentAbsent.filter((t: string) => t !== name);
+      
+      // Update specifically the absent field
+      await updateDoc(docRef, {
+        absent: newAbsent,
+        updatedAt: serverTimestamp()
+      });
+      
+      setSelectedNoticeItem(null);
+      alert("रिकॉर्ड सफलतापूर्वक हटा दिया गया है!");
+    } catch (err) {
+      console.error("Notice Board Delete Error:", err);
+      const errorMessage = err instanceof Error ? err.message : "अज्ञात समस्या";
+      alert("हटाने में विफल: " + errorMessage);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDeleteTeacher = async (teacher: Teacher) => {
@@ -633,7 +720,100 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto p-4 md:p-6">
         {viewMode === 'daily' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="space-y-8">
+            {/* Notice Board Section (Now at the absolute Top) */}
+            {noticeBoardData.length > 0 && (
+              <div className="w-full animate-in fade-in slide-in-from-top-4 duration-700">
+                <div className="bg-slate-900 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
+                  
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h3 className="text-xl font-black text-white tracking-tight uppercase flex items-center gap-3">
+                          <span className="bg-red-500 w-1.5 h-6 rounded-full"></span>
+                          सूचना बोर्ड (NOTICE BOARD)
+                        </h3>
+                        <p className="text-indigo-400 text-[9px] font-black uppercase tracking-[0.2em] mt-1 ml-4">किसी तिथि को सिलेक्ट करके डिलीट करें</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        {selectedNoticeItem && (
+                          <button 
+                            onClick={handleDeleteNoticeItem}
+                            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase shadow-xl shadow-red-500/40 flex items-center gap-2 animate-in zoom-in-95"
+                          >
+                            <Trash2 size={16}/> रिकॉर्ड हटाएं
+                          </button>
+                        )}
+                        <div className="hidden md:block">
+                          <MessageCircle size={24} className="text-white/10" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {noticeBoardData.map((item) => {
+                        const hasSelection = selectedNoticeItem?.name === item.name;
+                        return (
+                          <div 
+                            key={item.name} 
+                            onClick={() => {
+                              if (!hasSelection) {
+                                setSelectedNoticeItem({ name: item.name, date: item.dates[0] });
+                              }
+                            }}
+                            className={`bg-white/5 border backdrop-blur-md rounded-2xl p-4 hover:bg-white/10 transition-all cursor-pointer ${
+                              hasSelection ? "border-indigo-500/50 bg-white/10 shadow-lg shadow-indigo-500/10" : "border-white/10"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs transition-colors ${
+                                hasSelection ? "bg-indigo-500 text-white" : "bg-indigo-500/20 text-indigo-300"
+                              }`}>
+                                {item.name.charAt(0)}
+                              </div>
+                              <h4 className={`font-black text-xs uppercase tracking-tight transition-colors ${
+                                hasSelection ? "text-white" : "text-slate-300"
+                              }`}>{item.name}</h4>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-1.5">
+                              {item.dates.map(date => {
+                                const isToday = date === new Date().toISOString().split('T')[0];
+                                const isSelected = selectedNoticeItem?.name === item.name && selectedNoticeItem?.date === date;
+                                return (
+                                  <button 
+                                    key={date} 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedNoticeItem(isSelected ? null : { name: item.name, date });
+                                    }}
+                                    className={`px-2 py-1 text-[8px] font-black rounded-lg border flex items-center gap-1 transition-all ${
+                                      isSelected
+                                        ? "bg-red-600 text-white border-red-500 shadow-lg scale-105"
+                                        : isToday 
+                                          ? "bg-red-500/20 text-red-400 border-red-500/30" 
+                                          : "bg-white/5 text-slate-300 border-white/10 hover:border-indigo-500"
+                                    }`}
+                                  >
+                                    {isToday && !isSelected && <div className="w-1 h-1 rounded-full bg-red-400 animate-pulse"></div>}
+                                    {date.split('-').reverse().join('/')}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Selection Sidebar */}
             <div className="lg:col-span-5 space-y-4">
@@ -690,9 +870,19 @@ export default function App() {
                       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                         <BarChart3 size={14} className="text-indigo-500"/> टीचर डायरेक्टरी
                       </h3>
-                      <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full uppercase">
-                        {filteredTeachers.length} / {teachers.length}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {absentTeachers.length > 0 && !confirmedAbsent && (
+                          <button 
+                            onClick={handleClearTodayAbsent}
+                            className="text-[8px] font-black text-red-500 bg-red-50 px-2 py-1 rounded-md border border-red-100 hover:bg-red-100 transition-all uppercase"
+                          >
+                            लिस्ट साफ़ करें
+                          </button>
+                        )}
+                        <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full uppercase">
+                          {filteredTeachers.length} / {teachers.length}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="relative mb-4">
@@ -769,7 +959,7 @@ export default function App() {
             </div>
 
             {/* Board Column */}
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-7 space-y-6">
               {!confirmedAbsent ? (
                 <div className="bg-white rounded-[3.5rem] border-2 border-dashed border-slate-200 h-full min-h-[500px] flex flex-col items-center justify-center text-slate-300 text-center p-12 shadow-inner">
                   <div className="bg-slate-50 p-10 rounded-full mb-6 shadow-inner"><Users size={80} className="opacity-10"/></div>
@@ -871,7 +1061,8 @@ export default function App() {
               )}
             </div>
           </div>
-        ) : (
+        </div>
+      ) : (
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="bg-white p-8 rounded-[3rem] border shadow-sm">
               <div className="flex items-center justify-between mb-8">
@@ -905,6 +1096,38 @@ export default function App() {
                   )}
                 </div>
               </div>
+
+              {/* Future Absences Section */}
+              {futureAbsences.length > 0 && (
+                <div className="mb-10 bg-amber-50 rounded-[2rem] border border-amber-100 overflow-hidden">
+                  <div className="px-6 py-4 bg-amber-100/50 border-b border-amber-100 flex items-center justify-between">
+                    <h4 className="text-[11px] font-black text-amber-800 uppercase tracking-widest flex items-center gap-2">
+                      <Clock size={16}/> आने वाली छुट्टियां (Upcoming Absences)
+                    </h4>
+                    <span className="text-[10px] font-black bg-white text-amber-600 px-3 py-1 rounded-full">{futureAbsences.length} दिन शेड्यूल हैं</span>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {futureAbsences.map(fa => (
+                      <div key={fa.date} className="bg-white p-4 rounded-2xl border border-amber-100/50 shadow-sm transition-all hover:shadow-md">
+                        <p className="text-[10px] font-black text-amber-500 mb-2 uppercase tracking-tight flex items-center gap-2 font-mono">
+                          <CalendarIcon size={12}/> {fa.date.split('-').reverse().join('/')}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {fa.teachers.map(name => (
+                            <span key={name} className="px-2 py-1 bg-amber-50 text-amber-800 rounded-lg text-[9px] font-bold border border-amber-100">{name}</span>
+                          ))}
+                        </div>
+                        <button 
+                          onClick={() => { setSelectedDate(fa.date); setViewMode('daily'); }}
+                          className="mt-3 w-full text-[8px] font-black text-amber-600 text-center uppercase tracking-widest hover:underline"
+                        >
+                          तारीख पर जाएं और एडिट करें →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="relative mb-6">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
