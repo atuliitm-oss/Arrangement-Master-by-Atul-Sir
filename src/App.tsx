@@ -236,10 +236,26 @@ export default function App() {
   const updateDailyData = async (updates: any) => {
     try {
       const docRef = doc(db, "dailyData", selectedDate);
-      await setDoc(docRef, {
+      
+      // Try update first as it naturally handles overwriting top-level fields (like arrangements object)
+      // without performing a shallow recursive merge like setDoc merge:true does.
+      await updateDoc(docRef, {
         ...updates,
         updatedAt: serverTimestamp()
-      }, { merge: true });
+      }).catch(async (e) => {
+        // If document doesn't exist, use setDoc to create it
+        if (e.code === 'not-found') {
+          await setDoc(docRef, {
+            absent: [],
+            confirmed: false,
+            arrangements: {},
+            ...updates,
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          throw e;
+        }
+      });
     } catch (err) {
       console.error("Firestore Update Error", err);
     }
@@ -410,7 +426,12 @@ export default function App() {
   };
 
   const autoArrangeAll = () => {
-    const newArr = { ...arrangements };
+    // Deep clone arrangements to avoid mutation
+    const newArr: any = {};
+    Object.keys(arrangements).forEach(pIdx => {
+      newArr[pIdx] = { ...arrangements[pIdx] };
+    });
+
     const tempCounts = { ...subCounts };
     periods.forEach((_, pIdx) => {
       if (!newArr[pIdx]) newArr[pIdx] = {};
@@ -421,7 +442,6 @@ export default function App() {
           const targetGroup = getClassGroup(extractClassNum(classInfo));
           let available = getFreeTeachers(pIdx, newArr[pIdx], targetGroup);
           
-          // Fallback: If no teacher from same group, check all available
           if (available.length === 0) {
             available = getFreeTeachers(pIdx, newArr[pIdx], null);
           }
@@ -1026,8 +1046,12 @@ export default function App() {
                                     <div className="bg-emerald-50 text-emerald-800 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between font-black text-[11px] shadow-sm">
                                       <span className="flex items-center gap-2 truncate"><CheckCircle2 size={14}/> {assigned}</span>
                                       <button onClick={() => {
+                                        // Clone specifically for manual deletion
                                         const next = { ...arrangements };
-                                        delete next[pIdx][absName];
+                                        if (next[pIdx]) {
+                                          next[pIdx] = { ...next[pIdx] };
+                                          delete next[pIdx][absName];
+                                        }
                                         handleUpdateArrangements(next);
                                       }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
                                     </div>
@@ -1036,7 +1060,7 @@ export default function App() {
                                       className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-[10px] font-black outline-none focus:ring-2 ring-indigo-500 cursor-pointer shadow-sm transition-all"
                                       onChange={(e) => {
                                         const next = { ...arrangements };
-                                        if(!next[pIdx]) next[pIdx] = {};
+                                        next[pIdx] = { ...(next[pIdx] || {}) };
                                         next[pIdx][absName] = e.target.value;
                                         handleUpdateArrangements(next);
                                       }}
