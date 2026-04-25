@@ -104,8 +104,8 @@ export default function App() {
     const teacherMap: { [name: string]: string[] } = {};
 
     Object.keys(dailyRegistry).forEach(date => {
-      // Show all recorded absences so they can be cleaned if needed
-      if (dailyRegistry[date].absent?.length > 0) {
+      // Show only current and future absences on the notice board
+      if (date >= todayStr && dailyRegistry[date].absent?.length > 0) {
         dailyRegistry[date].absent.forEach((name: string) => {
           if (!teacherMap[name]) teacherMap[name] = [];
           if (!teacherMap[name].includes(date)) teacherMap[name].push(date);
