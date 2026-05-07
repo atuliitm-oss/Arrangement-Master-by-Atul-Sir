@@ -964,8 +964,11 @@ export default function App() {
                             <UserX size={18}/> अनुपस्थित फाइनल करें ({absentTeachers.length})
                           </button>
                         ) : (
-                          <button onClick={() => {handleConfirmAbsent(false); handleUpdateArrangements({});}} className="w-full text-indigo-600 font-black text-[10px] p-2 text-center uppercase tracking-widest hover:underline">
-                            ← लिस्ट बदलें
+                          <button 
+                            onClick={() => handleConfirmAbsent(false)} 
+                            className="w-full bg-indigo-50 text-indigo-600 font-black text-[10px] p-4 rounded-2xl border border-indigo-100 text-center uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                          >
+                            <UserPlus size={14}/> एब्सेंट लिस्ट बदलें
                           </button>
                         )}
                       </div>
@@ -999,9 +1002,17 @@ export default function App() {
                       <h2 className="text-2xl font-black text-slate-800 leading-none">{selectedDay}</h2>
                       <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-2 italic">Substitute Matrix - Atul Sharma Sir</p>
                     </div>
-                    <button onClick={autoArrangeAll} className="bg-indigo-600 text-white px-5 py-3 rounded-2xl font-black text-[10px] flex items-center gap-2 shadow-xl active:scale-95 transition-all uppercase tracking-widest">
-                      <Wand2 size={16}/> ऑटो-असाइन
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleConfirmAbsent(false)}
+                        className="bg-slate-100 text-slate-600 px-5 py-3 rounded-2xl font-black text-[10px] flex items-center gap-2 hover:bg-slate-200 transition-all uppercase tracking-widest"
+                      >
+                        <UserPlus size={16}/> लिस्ट बदलें (Edit List)
+                      </button>
+                      <button onClick={autoArrangeAll} className="bg-indigo-600 text-white px-5 py-3 rounded-2xl font-black text-[10px] flex items-center gap-2 shadow-xl active:scale-95 transition-all uppercase tracking-widest">
+                        <Wand2 size={16}/> ऑटो-असाइन
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid gap-4">
