@@ -21,9 +21,7 @@ import {
   onSnapshot, 
   writeBatch,
   serverTimestamp,
-  arrayRemove,
-  deleteField,
-  FieldPath
+  arrayRemove
 } from 'firebase/firestore';
 
 // एक्सेल लाइब्रेरी (SheetJS) लोड करने के लिए फंक्शन
@@ -1060,39 +1058,30 @@ export default function App() {
                                       <span className="flex items-center gap-2 truncate"><CheckCircle2 size={14}/> {assigned}</span>
                                       <button 
                                         type="button"
-                                        onClick={async (e) => {
+                                        onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          try {
-                                            const docRef = doc(db, "dailyData", selectedDate);
-                                            // Using FieldPath to safely handle keys that might contain dots
-                                            await updateDoc(docRef, new FieldPath("arrangements", pIdx.toString(), absName), deleteField());
+                                          
+                                          // Clone to avoid mutation
+                                          const next = { ...arrangements };
+                                          if (next[pIdx]) {
+                                            next[pIdx] = { ...next[pIdx] };
+                                            delete next[pIdx][absName];
                                             
-                                            // Optimistic local update for immediate UI feedback
-                                            const next = { ...arrangements };
-                                            if (next[pIdx]) {
-                                              next[pIdx] = { ...next[pIdx] };
-                                              delete next[pIdx][absName];
-                                              setDailyRegistry(prev => ({
-                                                ...prev,
-                                                [selectedDate]: {
-                                                  ...(prev[selectedDate] || {}),
-                                                  arrangements: next
-                                                }
-                                              }));
-                                            }
-                                          } catch (err) {
-                                            console.error("Delete Arrangement Error:", err);
-                                            // Fallback to the older method if dot-notation fails
-                                            const next = { ...arrangements };
-                                            if (next[pIdx]) {
-                                              next[pIdx] = { ...next[pIdx] };
-                                              delete next[pIdx][absName];
-                                              handleUpdateArrangements(next);
-                                            }
+                                            // 1. Immediate local update for UI snappy feel
+                                            setDailyRegistry(prev => ({
+                                              ...prev,
+                                              [selectedDate]: {
+                                                ...(prev[selectedDate] || {}),
+                                                arrangements: next
+                                              }
+                                            }));
+                                            
+                                            // 2. Persist to Firestore using the standard helper
+                                            handleUpdateArrangements(next);
                                           }
                                         }} 
-                                        className="text-slate-300 hover:text-red-500 transition-colors p-2 -mr-2 active:scale-90"
+                                        className="text-slate-300 hover:text-red-500 transition-colors p-2 -mr-2 active:scale-95"
                                         title="डिलीट करें"
                                       >
                                         <Trash2 size={18}/>
