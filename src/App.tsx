@@ -1054,39 +1054,37 @@ export default function App() {
                                   </div>
 
                                   {assigned ? (
-                                    <div className="bg-emerald-50 text-emerald-800 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between font-black text-[11px] shadow-sm">
-                                      <span className="flex items-center gap-2 truncate"><CheckCircle2 size={14}/> {assigned}</span>
-                                      <button 
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
+                                    <button 
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        
+                                        // Clone to avoid mutation
+                                        const next = { ...arrangements };
+                                        if (next[pIdx]) {
+                                          next[pIdx] = { ...next[pIdx] };
+                                          delete next[pIdx][absName];
                                           
-                                          // Clone to avoid mutation
-                                          const next = { ...arrangements };
-                                          if (next[pIdx]) {
-                                            next[pIdx] = { ...next[pIdx] };
-                                            delete next[pIdx][absName];
-                                            
-                                            // 1. Immediate local update for UI snappy feel
-                                            setDailyRegistry(prev => ({
-                                              ...prev,
-                                              [selectedDate]: {
-                                                ...(prev[selectedDate] || {}),
-                                                arrangements: next
-                                              }
-                                            }));
-                                            
-                                            // 2. Persist to Firestore using the standard helper
-                                            handleUpdateArrangements(next);
-                                          }
-                                        }} 
-                                        className="text-slate-300 hover:text-red-500 transition-colors p-2 -mr-2 active:scale-95"
-                                        title="डिलीट करें"
-                                      >
-                                        <Trash2 size={18}/>
-                                      </button>
-                                    </div>
+                                          // 1. Immediate local update for UI snappy feel
+                                          setDailyRegistry(prev => ({
+                                            ...prev,
+                                            [selectedDate]: {
+                                              ...(prev[selectedDate] || {}),
+                                              arrangements: next
+                                            }
+                                          }));
+                                          
+                                          // 2. Persist to Firestore using the standard helper
+                                          handleUpdateArrangements(next);
+                                        }
+                                      }} 
+                                      className="w-full bg-emerald-50 text-emerald-800 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between font-black text-[11px] shadow-sm hover:bg-emerald-100 transition-all active:scale-95 cursor-pointer"
+                                      title="बदलने के लिए क्लिक करें"
+                                    >
+                                      <span className="flex items-center gap-2 truncate"><CheckCircle2 size={14} className="text-emerald-600"/> {assigned}</span>
+                                      <span className="text-[9px] uppercase tracking-tighter opacity-50 flex items-center gap-1">टैप करें बदलें <Trash2 size={12}/></span>
+                                    </button>
                                   ) : (
                                     <select 
                                       className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-[10px] font-black outline-none focus:ring-2 ring-indigo-500 cursor-pointer shadow-sm transition-all"
